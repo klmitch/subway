@@ -51,6 +51,7 @@ setup(
     tests_require=readreq('.test-requires'),
     entry_points={
         'console_scripts': [
+            "subway = subway:subway.console",
         ],
     },
 )

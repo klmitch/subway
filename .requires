@@ -1,3 +1,4 @@
+cli_tools
 eventlet
 redis
 setuptools

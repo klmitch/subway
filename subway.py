@@ -13,14 +13,24 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ConfigParser
 import logging
 
+import cli_tools
 import eventlet
 import pkg_resources
 import redis
 
 
 LOG = logging.getLogger(__name__)
+
+
+class SubwayException(Exception):
+    """
+    An exception class for reporting errors from Subway.
+    """
+
+    pass
 
 
 class SubwayDaemon(object):
@@ -77,18 +87,6 @@ class SubwayDaemon(object):
 
         # Initialize the listening thread
         self.listen_thread = None
-
-    def start(self):
-        """
-        Start the daemon.  This will spawn the listening thread and
-        load the current limits from the master.
-        """
-
-        # Spawn the listening thread
-        self.listen_thread = eventlet.spawn_n(self.listen)
-
-        # And do the initial load
-        self.reload()
 
     def listen(self):
         """
@@ -396,3 +394,61 @@ def get_database(config):
 
     # Build and return the database client
     return redis.StrictRedis(**kwargs)
+
+
+@cli_tools.argument('config',
+                    help="Configuration file for subway.")
+def subway(config):
+    """
+    Run the Subway limits configuration synchronization daemon.
+
+    :param config: The configuration file for Subway.
+    """
+
+    # Set up eventlet, first thing...
+    eventlet.monkey_patch()
+
+    # Read the configuration file
+    conf = ConfigParser.SafeConfigParser()
+    conf.read([config])
+
+    # Suck in the subway config itself
+    try:
+        subway_config = dict(conf.items('config'))
+    except ConfigParser.NoSectionError:
+        # Use the defaults across the board
+        subway_config = {}
+
+    # Demand a "master" section
+    if not conf.has_section('master'):
+        raise SubwayException("Missing required configuration for the master")
+
+    # OK, let's set up the master
+    master = get_database(dict(conf.items('master')))
+
+    # Now set up the slaves...
+    slaves = []
+    for sect in conf.sections:
+        if not sect.startswith('slave:'):
+            continue
+
+        # OK, we don't actually care about the slave's name, and we'll
+        # only log errors trying to set up the connection to the slave
+        try:
+            slaves.append(get_database(dict(conf.items(sect))))
+        except redis.ConnectionError:
+            LOG.exception("Failed to connect to slave %r" %
+                          sect[len('slave:'):])
+
+    # Make sure we have at least one slave
+    if not slaves:
+        raise SubwayException("Missing configuration for slaves")
+
+    # Set up the daemon...
+    server = SubwayDaemon(subway_config, master, slaves)
+
+    # Do the initial limits loading
+    server.reload()
+
+    # Now, start listening for messages
+    server.listen()
