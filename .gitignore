@@ -1,0 +1,8 @@
+/build
+/.coverage
+/cov_html
+/dist
+/subway.egg-info
+/.tox
+*.log
+*.pyc
