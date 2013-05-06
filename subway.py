@@ -24,13 +24,48 @@ LOG = logging.getLogger(__name__)
 
 
 class SubwayDaemon(object):
+    """
+    The Subway daemon.  Subway listens for reload commands coming over
+    the Turnstile control channel; upon receiving one, it will copy
+    the limits configuration from the master to all configured slaves,
+    subsequently forwarding the reload command.  It will also forward
+    other Turnstile commands.
+
+    Note: At present, replies via the publish/subscribe mechanism do
+    not work; this in particular means that the "ping" command does
+    not function.
+    """
+
     _commands = {}
 
     @classmethod
     def _register(cls, name, func):
+        """
+        Register a function as an implementation of the named command.
+        This is used exclusively for internally implemented commands,
+        e.g., "reload"; other extension commands can be implemented as
+        functions in the "subway.commands" entrypoint group.
+
+        :param name: The name of the command.
+        :param func: The implementing function.
+        """
+
         cls._commands[name] = func
 
     def __init__(self, config, master, slaves):
+        """
+        Initialize the ``SubwayDaemon``.
+
+        :param config: A dictionary containing essential configuration
+                       values, such as "channel" or "limits_key".
+        :param master: A StrictRedis instance configured to connect to
+                       the master database.
+        :param slaves: A list of StrictRedis instances, each
+                       configured to connect to a different slave
+                       database.
+        """
+
+        # Save the configuration and the redis instances
         self.config = config
         self.master = master
         self.slaves = slaves
@@ -44,6 +79,11 @@ class SubwayDaemon(object):
         self.listen_thread = None
 
     def start(self):
+        """
+        Start the daemon.  This will spawn the listening thread and
+        load the current limits from the master.
+        """
+
         # Spawn the listening thread
         self.listen_thread = eventlet.spawn_n(self.listen)
 
@@ -51,6 +91,11 @@ class SubwayDaemon(object):
         self.reload()
 
     def listen(self):
+        """
+        Subscribe to and listen for messages on the master server's
+        control queue.
+        """
+
         # Need a pub-sub object
         kwargs = {}
         if 'shard_hint' in self.config:
@@ -89,6 +134,17 @@ class SubwayDaemon(object):
                                   (command, args))
 
     def find_command(self, command):
+        """
+        Look up the function implementing the given command.
+
+        :param command: The name of the command.
+
+        :returns: A callable implementing the command.  If the command
+                  is not implemented either natively nor in the
+                  "subway.commands" entrypoint group, the command will
+                  be forwarded unchanged to all slaves.
+        """
+
         # If we don't have the command, resolve it via entry points
         if command not in self._commands:
             for ep in pkg_resources.iter_entry_points("subway.commands",
@@ -115,6 +171,16 @@ class SubwayDaemon(object):
         return self._commands[command] or forward
 
     def reload(self, args=None):
+        """
+        Reload the limits configuration from the master database.  The
+        limits configuration will be forwarded to all slave databases,
+        and an appropriate "reload" command sent on all slave database
+        control queues.
+
+        :param args: If given, provides arguments to include as part
+                     of the reload command.
+        """
+
         send_reload = False
         key = self.config.get('limits_key', 'limits')
 
@@ -145,6 +211,16 @@ class SubwayDaemon(object):
             forward(self, 'reload', args)
 
     def update_limits(self, key, slave):
+        """
+        Perform the actual limits update on a given slave.  The limits
+        currently cached in the ``SubwayDaemon`` instance will be sent
+        to the given slave.
+
+        :param key: The key for storage of the limits configuration on
+                    the slave.
+        :param slave: The StrictRedis instance for the slave.
+        """
+
         limits_set = set(self.limits)
 
         with slave.pipeline() as pipe:
@@ -178,6 +254,17 @@ class SubwayDaemon(object):
 
 
 def forward(server, command, args):
+    """
+    Forward a command to all slaves.
+
+    :param server: The ``SubwayDaemon`` instance.
+    :param command: The command to forward.
+    :param args: Any arguments to provide for the command.  These
+                 arguments must already be constructed as a single
+                 string; note that Turnstile uses the colon character
+                 (":") as an argument separator.
+    """
+
     # Determine the channel to send to
     channel = server.config.get('channel', 'control')
 
@@ -192,6 +279,20 @@ def forward(server, command, args):
 
 
 def register(name, func=None):
+    """
+    Register a function as a command.  This is really only meant for
+    internally-implemented commands.
+
+    :param name: The command name.
+    :param func: The implementing function.  If not provided, a
+                 decorator will be returned.
+
+    :returns: If the ``func`` argument is provided, it is returned;
+              otherwise, a callable taking one argument--the
+              function--will be returned.  This allows the
+              ``register()`` function to be used as a decorator.
+    """
+
     def decorator(func):
         # Perform the registration
         SubwayDaemon._register(name, func)
@@ -207,6 +308,21 @@ def register(name, func=None):
 
 @register('reload')
 def reload(server, command, args):
+    """
+    Implement the "reload" command.  Interprets the arguments and
+    applies the appropriate load type and spread.  Note that if no
+    reload type is provided, but a default spread value is configured,
+    the reload will be forwarded as a "spread" with the configured
+    spread.
+
+    :param server: The ``SubwayDaemon`` instance.
+    :param command: The command to forward.
+    :param args: Any arguments to provide for the command.  These
+                 arguments must already be constructed as a single
+                 string; note that Turnstile uses the colon character
+                 (":") as an argument separator.
+    """
+
     # Process the arguments
     arglist = args.split(':')
     load_type = None
