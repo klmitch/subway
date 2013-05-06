@@ -359,3 +359,40 @@ def reload(server, command, args):
     else:
         # Spawn in immediate mode
         eventlet.spawn_n(server.reload, load_type)
+
+
+REDIS_CONFIGS = {
+    'host': str,
+    'port': int,
+    'db': int,
+    'password': str,
+    'socket_timeout': int,
+    'unix_socket_path': str,
+}
+
+
+def get_database(config):
+    """
+    Retrieve a ``StrictRedis`` instance based on the given
+    configuration.
+
+    :param config: A dictionary of configuration values for the
+                   connection to the Redis server.  All values are
+                   assumed to be strings.
+
+    :returns: An instance of ``StrictRedis`` configured for the
+              designated Redis server.
+    """
+
+    # Convert the configuration to keyword arguments for StrictRedis
+    kwargs = {}
+    for cfg_var, type_ in REDIS_CONFIGS.items():
+        if cfg_var in config:
+            kwargs[cfg_var] = type_(config[cfg_var])
+
+    # Make sure we have at a minimum the hostname
+    if 'host' not in kwargs and 'unix_socket_path' not in kwargs:
+        raise redis.ConnectionError("No host specified for redis database")
+
+    # Build and return the database client
+    return redis.StrictRedis(**kwargs)
