@@ -58,9 +58,9 @@ class SubwayDaemon(object):
 
         :param config: A dictionary containing essential configuration
                        values, such as "channel" or "limits_key".
-        :param master: A StrictRedis instance configured to connect to
-                       the master database.
-        :param slaves: A list of StrictRedis instances, each
+        :param master: A ``StrictRedis`` instance configured to
+                       connect to the master database.
+        :param slaves: A list of ``StrictRedis`` instances, each
                        configured to connect to a different slave
                        database.
         """
@@ -218,7 +218,7 @@ class SubwayDaemon(object):
 
         :param key: The key for storage of the limits configuration on
                     the slave.
-        :param slave: The StrictRedis instance for the slave.
+        :param slave: The ``StrictRedis`` instance for the slave.
         """
 
         limits_set = set(self.limits)
