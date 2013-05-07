@@ -314,24 +314,23 @@ def reload(server, command, args):
 
     # Process the arguments
     arglist = args.split(':')
-    load_type = None
+    load_type = arglist.pop(0)
     spread = None
-    if arglist:
-        load_type = arglist.pop(0)
-        if load_type == 'immediate':
-            # Immediate reload
-            pass
-        elif load_type == 'spread':
-            # Spread within an interval; what interval?
-            try:
-                spread = float(arglist.pop(0))
-            except (TypeError, ValueError):
-                # Not given or not a valid float; use the configured
-                # value
-                load_type = None
-        else:
-            # Unrecognized load type
+
+    if load_type == 'immediate':
+        # Immediate reload
+        pass
+    elif load_type == 'spread':
+        # Spread within an interval; what interval?
+        try:
+            spread = float(arglist.pop(0))
+        except (TypeError, ValueError):
+            # Not given or not a valid float; use the configured
+            # value
             load_type = None
+    else:
+        # Unrecognized load type
+        load_type = None
 
     # Use any configured spread
     if load_type is None:
