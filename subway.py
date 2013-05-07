@@ -85,9 +85,6 @@ class SubwayDaemon(object):
         # Need a semaphore to cover reloads in action
         self.pending = eventlet.semaphore.Semaphore()
 
-        # Initialize the listening thread
-        self.listen_thread = None
-
     def listen(self):
         """
         Subscribe to and listen for messages on the master server's
