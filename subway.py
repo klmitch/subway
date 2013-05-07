@@ -304,7 +304,7 @@ def reload(server, command, args):
     spread.
 
     :param server: The ``SubwayDaemon`` instance.
-    :param command: The command to forward.
+    :param command: The command.
     :param args: Any arguments to provide for the command.  These
                  arguments must already be constructed as a single
                  string; note that Turnstile uses the colon character
