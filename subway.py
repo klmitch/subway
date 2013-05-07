@@ -418,7 +418,7 @@ def subway(config):
 
     # Now set up the slaves...
     slaves = []
-    for sect in conf.sections:
+    for sect in conf.sections():
         if not sect.startswith('slave:'):
             continue
 
