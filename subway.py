@@ -274,19 +274,16 @@ def forward(server, command, args):
         slave.publish(channel, message)
 
 
-def register(name, func=None):
+def register(name):
     """
     Register a function as a command.  This is really only meant for
     internally-implemented commands.
 
     :param name: The command name.
-    :param func: The implementing function.  If not provided, a
-                 decorator will be returned.
 
-    :returns: If the ``func`` argument is provided, it is returned;
-              otherwise, a callable taking one argument--the
-              function--will be returned.  This allows the
-              ``register()`` function to be used as a decorator.
+    :returns: A callable taking one argument--the function.  This
+              allows the ``register()`` function to be used as a
+              decorator.
     """
 
     def decorator(func):
@@ -294,12 +291,7 @@ def register(name, func=None):
         SubwayDaemon._register(name, func)
         return func
 
-    # If func was given, call the decorator, otherwise, return the
-    # decorator
-    if func:
-        return decorator(func)
-    else:
-        return decorator
+    return decorator
 
 
 @register('reload')
