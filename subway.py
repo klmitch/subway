@@ -447,8 +447,10 @@ def subway(config):
     # Set up the daemon...
     server = SubwayDaemon(subway_config, master, slaves)
 
-    # Do the initial limits loading
-    server.reload()
+    # Do the initial limits loading, as a thread; we use spawn_after()
+    # so we make sure the listening thread gets started first, so we
+    # don't miss any reload commands
+    eventlet.spawn_after(2.0, server.reload)
 
     # Now, start listening for messages
     server.listen()
