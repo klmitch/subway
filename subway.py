@@ -194,6 +194,7 @@ class SubwayDaemon(object):
         except Exception:
             # Log an error
             LOG.exception("Could not load limits")
+            return
         finally:
             self.pending.release()
 
