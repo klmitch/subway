@@ -15,6 +15,7 @@
 
 import ConfigParser
 import logging
+import random
 
 import cli_tools
 import eventlet
